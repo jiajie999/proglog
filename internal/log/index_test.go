@@ -41,14 +41,17 @@ func TestIndexSimple(t *testing.T) {
 	}
 
 	//_, pos, err := idx.Read(5)
+	//
+	//println("===")
+	//x := []int{0, 1, 2, 3, 4, 5}
+	//for i := range x[0:3] {
+	//	println(i)
+	//
+	//}
 
-	println("===")
-	x := []int{0, 1, 2, 3, 4, 5}
-	for i := range x[0:3] {
-		println(i)
+	println("========")
+	println(len([]byte("hello world")))
 
-	}
-	
 }
 
 //
