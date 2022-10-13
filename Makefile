@@ -1,5 +1,5 @@
 # START: begin
-CONFIG_PATH=${HOME}/.proglog/
+CONFIG_PATH=${HOME}/.proglog
 
 .PHONY: init
 init:
