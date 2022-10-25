@@ -1,0 +1,282 @@
+@startuml
+namespace agent {
+    class Agent << (S,Aquamarine) >> {
+        - log *log.Log
+        - server *grpc.Server
+        - membership *discovery.Membership
+        - replicator *log.Replicator
+        - shutdown bool
+        - shutdowns <font color=blue>chan</font> <font color=blue>struct</font>{}
+        - shutdownLock sync.Mutex
+
+        - setupLogger() error
+        - setupLog() error
+        - setupServer() error
+        - setupMembership() error
+
+        + Shutdown() error
+
+    }
+    class Config << (S,Aquamarine) >> {
+        + ServerTLSConfig *tls.Config
+        + PeerTLSConfig *tls.Config
+        + DataDir string
+        + BindAddr string
+        + RPCPort int
+        + NodeName string
+        + StartJoinAddrs []string
+        + ACLModelFile string
+        + ACLPolicyFile string
+
+        + RPCAddr() (string, error)
+
+    }
+}
+"agent.Config" *-- "agent.Agent"
+
+
+namespace auth {
+    class Authorizer << (S,Aquamarine) >> {
+        - enforcer *casbin.Enforcer
+
+        + Authorize(subject string, object string, action string) error
+
+    }
+}
+
+"server.Authorizer" <|-- "auth.Authorizer"
+
+namespace config {
+    class TLSConfig << (S,Aquamarine) >> {
+        + CertFile string
+        + KeyFile string
+        + CAFile string
+        + ServerAddress string
+        + Server bool
+
+    }
+}
+
+
+namespace discovery {
+    class Config << (S,Aquamarine) >> {
+        + NodeName string
+        + BindAddr string
+        + Tags <font color=blue>map</font>[string]string
+        + StartJoinAddrs []string
+
+    }
+    interface Handler  {
+        + Join(name string, addr string) error
+        + Leave(name string) error
+
+    }
+    class Membership << (S,Aquamarine) >> {
+        - handler Handler
+        - serf *serf.Serf
+        - events <font color=blue>chan</font> serf.Event
+        - logger *zap.Logger
+
+        - setupSerf() error
+        - eventHandler() 
+        - handleJoin(member serf.Member) 
+        - handleLeave(member serf.Member) 
+        - isLocal(member serf.Member) bool
+        - logError(err error, msg string, member serf.Member) 
+
+        + Members() []serf.Member
+        + Leave() error
+
+    }
+}
+"discovery.Config" *-- "discovery.Membership"
+
+
+namespace log {
+    class Config << (S,Aquamarine) >> {
+        + Raft <font color=blue>struct</font>{raft.Config, *StreamLayer, bool}
+        + Segment <font color=blue>struct</font>{uint64, uint64, uint64}
+
+    }
+    class DistributedLog << (S,Aquamarine) >> {
+        - config Config
+        - log *Log
+        - raft *raft.Raft
+
+        - setupLog(dataDir string) error
+        - setupRaft(dataDir string) error
+        - apply(reqType RequestType, req proto.Message) (<font color=blue>interface</font>{}, error)
+
+        + Append(record *v1.Record) (uint64, error)
+        + Read(offset uint64) (*v1.Record, error)
+        + Join(id string, addr string) error
+        + Leave(id string) error
+        + WaitForLeader(timeout time.Duration) error
+        + Close() error
+
+    }
+    class Log << (S,Aquamarine) >> {
+        - mu sync.RWMutex
+        - activeSegment *segment
+        - segments []*segment
+
+        + Dir string
+        + Config Config
+
+        - setup() error
+        - newSegment(off uint64) error
+
+        + Append(record *v1.Record) (uint64, error)
+        + Read(off uint64) (*v1.Record, error)
+        + Close() error
+        + Remove() error
+        + Reset() error
+        + LowestOffset() (uint64, error)
+        + HighestOffset() (uint64, error)
+        + Truncate(lowest uint64) error
+        + Reader() io.Reader
+
+    }
+    class Replicator << (S,Aquamarine) >> {
+        - logger *zap.Logger
+        - mu sync.Mutex
+        - servers <font color=blue>map</font>[string]<font color=blue>chan</font> <font color=blue>struct</font>{}
+        - closed bool
+        - close <font color=blue>chan</font> <font color=blue>struct</font>{}
+
+        + DialOptions []grpc.DialOption
+        + LocalServer v1.LogClient
+
+        - replicate(addr string, leave <font color=blue>chan</font> <font color=blue>struct</font>{}) 
+        - init() 
+        - logError(err error, msg string, addr string) 
+
+        + Join(name string, addr string) error
+        + Leave(name string) error
+        + Close() error
+
+    }
+    class StreamLayer << (S,Aquamarine) >> {
+        - ln net.Listener
+        - serverTLSConfig *tls.Config
+        - peerTLSConfig *tls.Config
+
+        + Dial(addr raft.ServerAddress, timeout time.Duration) (net.Conn, error)
+        + Accept() (net.Conn, error)
+        + Close() error
+        + Addr() net.Addr
+
+    }
+    class fsm << (S,Aquamarine) >> {
+        - log *Log
+
+        - applyAppend(b []byte) <font color=blue>interface</font>{}
+
+        + Apply(record *raft.Log) <font color=blue>interface</font>{}
+        + Snapshot() (raft.FSMSnapshot, error)
+        + Restore(r io.ReadCloser) error
+
+    }
+    class index << (S,Aquamarine) >> {
+        - file *os.File
+        - mmap gommap.MMap
+        - size uint64
+
+        + Size uint64
+
+        + Close() error
+        + Read(in int64) (uint32, uint64, error)
+        + Write(off uint32, pos uint64) error
+        + Name() string
+
+    }
+    class log.RequestType << (T, #FF7700) >>  {
+    }
+    class logStore << (S,Aquamarine) >> {
+        + FirstIndex() (uint64, error)
+        + LastIndex() (uint64, error)
+        + GetLog(index uint64, out *raft.Log) error
+        + StoreLog(record *raft.Log) error
+        + StoreLogs(records []*raft.Log) error
+        + DeleteRange(min uint64, max uint64) error
+
+    }
+    class originReader << (S,Aquamarine) >> {
+        - off int64
+
+        + Read(p []byte) (int, error)
+
+    }
+    class segment << (S,Aquamarine) >> {
+        - store *store
+        - index *index
+        - baseOffset uint64
+        - config Config
+
+        + Append(record *v1.Record) (uint64, error)
+        + Read(off uint64) (*v1.Record, error)
+        + IsMaxed() bool
+        + Close() error
+        + Remove() error
+
+    }
+    class snapshot << (S,Aquamarine) >> {
+        - reader io.Reader
+
+        + Persist(sink raft.SnapshotSink) error
+        + Release() 
+
+    }
+    class store << (S,Aquamarine) >> {
+        - mu sync.Mutex
+        - buf *bufio.Writer
+        - size uint64
+
+        + Append(p []byte) (uint64, uint64, error)
+        + Read(pos uint64) ([]byte, error)
+        + ReadAt(p []byte, off int64) (int, error)
+        + Close() error
+
+    }
+}
+"log.Log" *-- "log.logStore"
+"log.store" *-- "log.originReader"
+"os.File" *-- "log.store"
+
+"discovery.Handler" <|-- "log.DistributedLog"
+"server.CommitLog" <|-- "log.DistributedLog"
+"server.CommitLog" <|-- "log.Log"
+"discovery.Handler" <|-- "log.Replicator"
+"server.CommitLog" <|-- "log.segment"
+
+namespace server {
+    interface Authorizer  {
+        + Authorize(subject string, object string, action string) error
+
+    }
+    interface CommitLog  {
+        + Append( *v1.Record) (uint64, error)
+        + Read( uint64) (*v1.Record, error)
+
+    }
+    class Config << (S,Aquamarine) >> {
+        + CommitLog CommitLog
+        + Authorizer Authorizer
+
+    }
+    class grpcServer << (S,Aquamarine) >> {
+        + Produce(ctx context.Context, req *v1.ProduceRequest) (*v1.ProduceResponse, error)
+        + Consume(ctx context.Context, req *v1.ConsumeRequest) (*v1.ConsumeResponse, error)
+        + ProduceStream(stream v1.Log_ProduceStreamServer) error
+        + ConsumeStream(req *v1.ConsumeRequest, stream v1.Log_ConsumeStreamServer) error
+
+    }
+    class subjectContextKey << (S,Aquamarine) >> {
+    }
+}
+"server.Config" *-- "server.grpcServer"
+"v1.UnimplementedLogServer" *-- "server.grpcServer"
+
+
+"__builtin__.uint8" #.. "log.RequestType"
+@enduml

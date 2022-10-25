@@ -1,0 +1,175 @@
+@startuml
+namespace log_v1 {
+    class ConsumeRequest << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Offset uint64
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetOffset() uint64
+
+    }
+    class ConsumeResponse << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Record *Record
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetRecord() *Record
+
+    }
+    class ErrOffsetOutOfRange << (S,Aquamarine) >> {
+        + Offset uint64
+
+        + GRPCStatus() *status.Status
+        + Error() string
+
+    }
+    interface LogClient  {
+        + Produce(ctx context.Context, in *ProduceRequest, opts ...grpc.CallOption) (*ProduceResponse, error)
+        + Consume(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (*ConsumeResponse, error)
+        + ConsumeStream(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (Log_ConsumeStreamClient, error)
+        + ProduceStream(ctx context.Context, opts ...grpc.CallOption) (Log_ProduceStreamClient, error)
+
+    }
+    interface LogServer  {
+        - mustEmbedUnimplementedLogServer() 
+
+        + Produce( context.Context,  *ProduceRequest) (*ProduceResponse, error)
+        + Consume( context.Context,  *ConsumeRequest) (*ConsumeResponse, error)
+        + ConsumeStream( *ConsumeRequest,  Log_ConsumeStreamServer) error
+        + ProduceStream( Log_ProduceStreamServer) error
+
+    }
+    interface Log_ConsumeStreamClient  {
+        + Recv() (*ConsumeResponse, error)
+
+    }
+    interface Log_ConsumeStreamServer  {
+        + Send( *ConsumeResponse) error
+
+    }
+    interface Log_ProduceStreamClient  {
+        + Send( *ProduceRequest) error
+        + Recv() (*ProduceResponse, error)
+
+    }
+    interface Log_ProduceStreamServer  {
+        + Send( *ProduceResponse) error
+        + Recv() (*ProduceRequest, error)
+
+    }
+    class ProduceRequest << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Record *Record
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetRecord() *Record
+
+    }
+    class ProduceResponse << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Offset uint64
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetOffset() uint64
+
+    }
+    class Record << (S,Aquamarine) >> {
+        - state protoimpl.MessageState
+        - sizeCache protoimpl.SizeCache
+        - unknownFields protoimpl.UnknownFields
+
+        + Value []byte
+        + Offset uint64
+
+        + Reset() 
+        + String() string
+        + ProtoMessage() 
+        + ProtoReflect() protoreflect.Message
+        + Descriptor() ([]byte, []int)
+        + GetValue() []byte
+        + GetOffset() uint64
+
+    }
+    class UnimplementedLogServer << (S,Aquamarine) >> {
+        - mustEmbedUnimplementedLogServer() 
+
+        + Produce( context.Context,  *ProduceRequest) (*ProduceResponse, error)
+        + Consume( context.Context,  *ConsumeRequest) (*ConsumeResponse, error)
+        + ConsumeStream( *ConsumeRequest,  Log_ConsumeStreamServer) error
+        + ProduceStream( Log_ProduceStreamServer) error
+
+    }
+    interface UnsafeLogServer  {
+        - mustEmbedUnimplementedLogServer() 
+
+    }
+    class logClient << (S,Aquamarine) >> {
+        - cc grpc.ClientConnInterface
+
+        + Produce(ctx context.Context, in *ProduceRequest, opts ...grpc.CallOption) (*ProduceResponse, error)
+        + Consume(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (*ConsumeResponse, error)
+        + ConsumeStream(ctx context.Context, in *ConsumeRequest, opts ...grpc.CallOption) (Log_ConsumeStreamClient, error)
+        + ProduceStream(ctx context.Context, opts ...grpc.CallOption) (Log_ProduceStreamClient, error)
+
+    }
+    class logConsumeStreamClient << (S,Aquamarine) >> {
+        + Recv() (*ConsumeResponse, error)
+
+    }
+    class logConsumeStreamServer << (S,Aquamarine) >> {
+        + Send(m *ConsumeResponse) error
+
+    }
+    class logProduceStreamClient << (S,Aquamarine) >> {
+        + Send(m *ProduceRequest) error
+        + Recv() (*ProduceResponse, error)
+
+    }
+    class logProduceStreamServer << (S,Aquamarine) >> {
+        + Send(m *ProduceResponse) error
+        + Recv() (*ProduceRequest, error)
+
+    }
+}
+"grpc.ClientStream" *-- "log_v1.logConsumeStreamClient"
+"grpc.ServerStream" *-- "log_v1.logConsumeStreamServer"
+"grpc.ClientStream" *-- "log_v1.logProduceStreamClient"
+"grpc.ServerStream" *-- "log_v1.logProduceStreamServer"
+
+"log_v1.LogServer" <|-- "log_v1.UnimplementedLogServer"
+"log_v1.UnsafeLogServer" <|-- "log_v1.UnimplementedLogServer"
+"log_v1.LogClient" <|-- "log_v1.logClient"
+"log_v1.Log_ConsumeStreamClient" <|-- "log_v1.logConsumeStreamClient"
+"log_v1.Log_ConsumeStreamServer" <|-- "log_v1.logConsumeStreamServer"
+"log_v1.Log_ProduceStreamClient" <|-- "log_v1.logProduceStreamClient"
+"log_v1.Log_ProduceStreamServer" <|-- "log_v1.logProduceStreamServer"
+
+@enduml
